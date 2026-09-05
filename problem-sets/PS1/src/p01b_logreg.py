@@ -24,9 +24,6 @@ def main(train_path, eval_path, pred_path):
     print("The accuracy on validation set is: ", np.mean(model.predict(x_val) == y_val))
     with open(pred_path, "w") as file:
         file.write(str(model.predict(x_val)))
-
-    util.plot(x_val, y_val, theta=model.theta)
-    plt.show()
     # *** END CODE HERE ***
 
 class LogisticRegression(LinearModel):
@@ -86,6 +83,9 @@ class LogisticRegression(LinearModel):
         # *** START CODE HERE ***
         return np.matmul(X, self.theta) >= 0
         # *** END CODE HERE ***
+
+    def reset(self):
+        self.theta = None
 
 # if __name__ == "__main__":
 #     main("../data/ds1_train.csv", "../data/ds1_valid.csv", "")

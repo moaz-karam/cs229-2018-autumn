@@ -60,12 +60,13 @@ def load_dataset(csv_path, label_col='y', add_intercept=False):
     return inputs, labels
 
 
-def plot(x, y, theta, save_path=None, correction=1.0):
+def plot(x, y, thetas: list[np.ndarray], colors: list, save_path=None, correction=1.0):
     """Plot dataset and fitted logistic regression parameters.
     Args:
         x: Matrix of training examples, one per row.
         y: Vector of labels in {0, 1}.
-        theta: Vector of parameters for logistic regression model.
+        thetas: List of vectors of parameters for logistic regression model.
+        colors: List of colors for each theta with the same index
         save_path: Path to save the plot.
         correction: Correction factor to apply (Problem 2(e) only).
     """
@@ -75,13 +76,15 @@ def plot(x, y, theta, save_path=None, correction=1.0):
     plt.plot(x[y == 0, -2], x[y == 0, -1], 'go', linewidth=2)
 
     # Plot decision boundary (found by solving for theta^T x = 0)
-    margin1 = (max(x[:, -2]) - min(x[:, -2]))*0.2
-    margin2 = (max(x[:, -1]) - min(x[:, -1]))*0.2
-    x1 = np.arange(min(x[:, -2])-margin1, max(x[:, -2])+margin1, 0.01)
-    x2 = -(theta[0] / theta[2] * correction + theta[1] / theta[2] * x1)
-    plt.plot(x1, x2, c='red', linewidth=2)
-    plt.xlim(x[:, -2].min()-margin1, x[:, -2].max()+margin1)
-    plt.ylim(x[:, -1].min()-margin2, x[:, -1].max()+margin2)
+    for i in range(len(thetas)):
+        theta = thetas[i]
+        margin1 = (max(x[:, -2]) - min(x[:, -2]))*0.2
+        margin2 = (max(x[:, -1]) - min(x[:, -1]))*0.2
+        x1 = np.arange(min(x[:, -2])-margin1, max(x[:, -2])+margin1, 0.01)
+        x2 = -(theta[0] / theta[2] * correction + theta[1] / theta[2] * x1)
+        plt.plot(x1, x2, c=colors[i], linewidth=2)
+        plt.xlim(x[:, -2].min()-margin1, x[:, -2].max()+margin1)
+        plt.ylim(x[:, -1].min()-margin2, x[:, -1].max()+margin2)
 
     # Add labels and save to disk
     plt.xlabel('x1')
