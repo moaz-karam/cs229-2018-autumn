@@ -33,13 +33,12 @@ def main(tau, train_path, eval_path):
     lwr = LocallyWeightedLinearRegression(tau)
     lwr.fit(x_train, y_train)
 
-    print("mse:", mse(lwr.predict(x_eval), y_eval))
-
-
+    print(f'tau: {tau} \t mse: {mse(lwr.predict(x_eval), y_eval)}')
 
     # plot(x_train[:, 1], y_train, 'bx')
     plot(x_eval[:, 1], y_eval, 'r.')
     plot(x_eval[:, 1], lwr.predict(x_eval), 'k+')
+    plt.legend(['predicted', 'actual'])
     plt.show()
 
     # *** START CODE HERE ***
@@ -108,10 +107,10 @@ class LocallyWeightedLinearRegression(LinearModel):
             Outputs of shape (m,).
         """
         # *** START CODE HERE ***
-        pred = np.array([self.predict_point(x_p) for x_p in x])
-        return pred
+        return np.apply_along_axis(self.predict_point, 1, x)
         # *** END CODE HERE ***
 
 
 if __name__ == "__main__":
-    main(5e-2, "../data/ds5_train.csv", "../data/ds5_valid.csv")
+    for tau in [3e-2, 5e-2, 1e-1, 5e-1, 1e0, 1e1]:
+        main(tau, "../data/ds5_train.csv", "../data/ds5_valid.csv")
