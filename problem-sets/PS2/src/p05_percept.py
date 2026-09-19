@@ -5,6 +5,28 @@ import numpy as np
 
 import util
 
+class KernelPrecept:
+    def __init__(self):
+        self.betas = []
+        self.X = []
+
+    def calculate_sum(self, kernel, x_i):
+        sum = 0
+        for j in range(len(self.betas)):
+            beta_j = self.betas[j]
+            x_j = self.X[j]
+            sum += beta_j * kernel(x_j, x_i)            
+        return sum
+
+    def predict(self, kernel, x_i):
+        return sign(self.calculate_sum(kernel, x_i))
+        
+
+    def update_state(self, kernel, learning_rate, x_i, y_i):
+        kernel_sum = self.calculate_sum(kernel, x_i)
+        new_beta = learning_rate * (y_i - sign(kernel_sum))
+        self.X.append(x_i)
+        self.betas.append(new_beta)
 
 def initial_state():
     """Return the initial state for the perceptron.
@@ -16,10 +38,11 @@ def initial_state():
     """
 
     # *** START CODE HERE ***
+    return KernelPrecept()
     # *** END CODE HERE ***
 
 
-def predict(state, kernel, x_i):
+def predict(state: KernelPrecept, kernel, x_i):
     """Peform a prediction on a given instance x_i given the current state
     and the kernel.
 
@@ -33,10 +56,11 @@ def predict(state, kernel, x_i):
         Returns the prediction (i.e 0 or 1)
     """
     # *** START CODE HERE ***
+    return state.predict(kernel, x_i)
     # *** END CODE HERE ***
 
 
-def update_state(state, kernel, learning_rate, x_i, y_i):
+def update_state(state: KernelPrecept, kernel, learning_rate, x_i, y_i):
     """Updates the state of the perceptron.
 
     Args:
@@ -47,6 +71,7 @@ def update_state(state, kernel, learning_rate, x_i, y_i):
         y_i: A 0 or 1 indicating the label for a single instance
     """
     # *** START CODE HERE ***
+    state.update_state(kernel, learning_rate, x_i, y_i)
     # *** END CODE HERE ***
 
 
@@ -111,11 +136,12 @@ def train_perceptron(kernel_name, kernel, learning_rate):
     predict_y = [predict(state, kernel, test_x[i, :]) for i in range(test_y.shape[0])]
 
     np.savetxt('./output/p05_{}_predictions'.format(kernel_name), predict_y)
+    print(np.mean(predict_y == test_y))
 
 
 def main():
-    train_perceptron('dot', dot_kernel, 0.5)
-    train_perceptron('rbf', rbf_kernel, 0.5)
+    train_perceptron('dot', dot_kernel, 0.3)
+    train_perceptron('rbf', rbf_kernel, 0.3)
 
 
 if __name__ == "__main__":

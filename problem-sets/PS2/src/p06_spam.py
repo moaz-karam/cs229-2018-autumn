@@ -1,7 +1,7 @@
 import collections
 
 import numpy as np
-
+import string
 import util
 import svm
 
@@ -21,6 +21,10 @@ def get_words(message):
     """
 
     # *** START CODE HERE ***
+    message = message.translate(str.maketrans("", "", string.punctuation))
+    words = message.split()
+    normalized_words = [w.lower() for w in words]
+    return normalized_words
     # *** END CODE HERE ***
 
 
@@ -41,6 +45,23 @@ def create_dictionary(messages):
     """
 
     # *** START CODE HERE ***
+    words_dict = {}
+    intermediate_dict = {}
+    dict_counter = 0
+    
+    for m in messages:
+        words = get_words(m)
+        for w in words:
+            if w in words_dict:
+                continue
+            if w in intermediate_dict:
+                intermediate_dict[w] += 1
+                if intermediate_dict[w] >= 5:
+                    words_dict[w] = dict_counter
+                    dict_counter += 1
+            else:
+                intermediate_dict[w] = 1
+    return words_dict
     # *** END CODE HERE ***
 
 
@@ -62,6 +83,17 @@ def transform_text(messages, word_dictionary):
         A numpy array marking the words present in each message.
     """
     # *** START CODE HERE ***
+    n_messages = len(messages)
+    n_words = len(word_dictionary)
+    words_array = np.zeros(shape=(n_messages, n_words))
+
+    for i in range(n_messages):
+        clean_words = get_words(messages[i])
+        for w in clean_words:
+            if w in word_dictionary:
+                w_index = word_dictionary[w]
+                words_array[i, w_index] += 1
+    return words_array
     # *** END CODE HERE ***
 
 
@@ -82,8 +114,39 @@ def fit_naive_bayes_model(matrix, labels):
     """
 
     # *** START CODE HERE ***
+    k = matrix[0].shape[0]
+    
+    p_y_1 = len([labels == 1]) / len(labels)
+    p_y_0 = 1 - p_y_1
+
+    x_1 = matrix[labels == 1]
+    x_1_sum = np.sum(x_1, axis=0)
+    p_x_given_y_1 = (1 + x_1_sum) / (k + np.sum(x_1))
+
+    x_0 = matrix[labels == 0]
+    x_0_sum = np.sum(x_0, axis=0)
+    p_x_given_y_0 = (1 + x_0_sum) / (k + np.sum(x_0))
+
+    p_x = p_x_given_y_0 * p_y_0 + p_x_given_y_1 * p_y_1
+
+
+
+    # p_x[p_x == 0] = 1 / k
+    # p_x_given_y_1[p_x_given_y_1 == 0] = 1 / k
+    # p_x_given_y_0[p_x_given_y_0 == 0] = 1 / k
+
+    return (p_y_1, p_x_given_y_1, p_x_given_y_0, p_x)
     # *** END CODE HERE ***
 
+def calculate_log_prob(vector, p_y, p_x_given_y_1, p_x):
+    p_x = np.log(p_x)
+    p_x_given_y_1 = np.log(p_x_given_y_1)
+
+    log_mutual_prob_given_y_1 = np.log(p_y) + np.sum(p_x_given_y_1 * vector)
+    log_mutual_prob = np.sum(p_x * vector)
+    log_p_y_1_given_x = log_mutual_prob_given_y_1 - log_mutual_prob
+
+    return log_p_y_1_given_x
 
 def predict_from_naive_bayes_model(model, matrix):
     """Use a Naive Bayes model to compute predictions for a target matrix.
@@ -98,6 +161,8 @@ def predict_from_naive_bayes_model(model, matrix):
     Returns: A numpy array containg the predictions from the model
     """
     # *** START CODE HERE ***
+    p_y, p_x_given_y_1, _, p_x = model
+    return np.apply_along_axis(calculate_log_prob, 1, matrix, p_y, p_x_given_y_1, p_x) >= -0.69
     # *** END CODE HERE ***
 
 
@@ -114,6 +179,15 @@ def get_top_five_naive_bayes_words(model, dictionary):
     Returns: The top five most indicative words in sorted order with the most indicative first
     """
     # *** START CODE HERE ***
+    _, p_x_given_y_1, p_x_given_y_0, _ = model
+    diff  = np.log(p_x_given_y_1) - np.log(p_x_given_y_0)
+    top_5 = []
+    for i in range(5):
+        index = np.argmax(diff)
+        top_5.append(index)
+        diff[index] = 0
+
+    return [k for (k, v) in dictionary.items() if v in top_5]
     # *** END CODE HERE ***
 
 
@@ -134,6 +208,14 @@ def compute_best_svm_radius(train_matrix, train_labels, val_matrix, val_labels, 
         The best radius which maximizes SVM accuracy.
     """
     # *** START CODE HERE ***
+    accuracies = {}
+    for r in radius_to_consider:
+        val_predict = svm.train_and_predict_svm(train_matrix, train_labels, val_matrix, r)
+        accuracy = np.mean(val_predict == val_labels)
+        accuracies[accuracy] = r
+
+    best_accuracy = max(accuracies.keys())
+    return accuracies[best_accuracy]
     # *** END CODE HERE ***
 
 
