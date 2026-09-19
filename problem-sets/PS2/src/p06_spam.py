@@ -116,34 +116,34 @@ def fit_naive_bayes_model(matrix, labels):
     # *** START CODE HERE ***
     k = matrix[0].shape[0]
     
-    p_y_1 = len([labels == 1]) / len(labels)
-    p_y_0 = 1 - p_y_1
+    phi_y_1 = len([labels == 1]) / len(labels)
+    phi_y_0 = 1 - phi_y_1
 
     x_1 = matrix[labels == 1]
     x_1_sum = np.sum(x_1, axis=0)
-    p_x_given_y_1 = (1 + x_1_sum) / (k + np.sum(x_1))
+    phi_x_given_y_1 = (1 + x_1_sum) / (k + np.sum(x_1))
 
     x_0 = matrix[labels == 0]
     x_0_sum = np.sum(x_0, axis=0)
-    p_x_given_y_0 = (1 + x_0_sum) / (k + np.sum(x_0))
+    phi_x_given_y_0 = (1 + x_0_sum) / (k + np.sum(x_0))
 
-    p_x = p_x_given_y_0 * p_y_0 + p_x_given_y_1 * p_y_1
+    phi_x = phi_x_given_y_0 * phi_y_0 + phi_x_given_y_1 * phi_y_1
 
 
 
-    # p_x[p_x == 0] = 1 / k
-    # p_x_given_y_1[p_x_given_y_1 == 0] = 1 / k
-    # p_x_given_y_0[p_x_given_y_0 == 0] = 1 / k
+    # phi_x[phi_x == 0] = 1 / k
+    # phi_x_given_y_1[phi_x_given_y_1 == 0] = 1 / k
+    # phi_x_given_y_0[phi_x_given_y_0 == 0] = 1 / k
 
-    return (p_y_1, p_x_given_y_1, p_x_given_y_0, p_x)
+    return (phi_y_1, phi_x_given_y_1, phi_x_given_y_0, phi_x)
     # *** END CODE HERE ***
 
-def calculate_log_prob(vector, p_y, p_x_given_y_1, p_x):
-    p_x = np.log(p_x)
-    p_x_given_y_1 = np.log(p_x_given_y_1)
+def calculate_log_prob(vector, phi_y, phi_x_given_y_1, phi_x):
+    phi_x = np.log(phi_x)
+    phi_x_given_y_1 = np.log(phi_x_given_y_1)
 
-    log_mutual_prob_given_y_1 = np.log(p_y) + np.sum(p_x_given_y_1 * vector)
-    log_mutual_prob = np.sum(p_x * vector)
+    log_mutual_prob_given_y_1 = np.log(phi_y) + np.sum(phi_x_given_y_1 * vector)
+    log_mutual_prob = np.sum(phi_x * vector)
     log_p_y_1_given_x = log_mutual_prob_given_y_1 - log_mutual_prob
 
     return log_p_y_1_given_x
@@ -161,8 +161,8 @@ def predict_from_naive_bayes_model(model, matrix):
     Returns: A numpy array containg the predictions from the model
     """
     # *** START CODE HERE ***
-    p_y, p_x_given_y_1, _, p_x = model
-    return np.apply_along_axis(calculate_log_prob, 1, matrix, p_y, p_x_given_y_1, p_x) >= -0.69
+    phi_y, phi_x_given_y_1, _, phi_x = model
+    return np.apply_along_axis(calculate_log_prob, 1, matrix, phi_y, phi_x_given_y_1, phi_x) >= np.log(0.5)
     # *** END CODE HERE ***
 
 
@@ -179,8 +179,8 @@ def get_top_five_naive_bayes_words(model, dictionary):
     Returns: The top five most indicative words in sorted order with the most indicative first
     """
     # *** START CODE HERE ***
-    _, p_x_given_y_1, p_x_given_y_0, _ = model
-    diff  = np.log(p_x_given_y_1) - np.log(p_x_given_y_0)
+    _, phi_x_given_y_1, phi_x_given_y_0, _ = model
+    diff  = np.log(phi_x_given_y_1) - np.log(phi_x_given_y_0)
     top_5 = []
     for i in range(5):
         index = np.argmax(diff)
