@@ -1,12 +1,13 @@
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 
 PLOT_COLORS = ['red', 'green', 'blue', 'orange']  # Colors for your plots
 K = 4           # Number of Gaussians in the mixture model
-NUM_TRIALS = 3  # Number of trials to run (can be adjusted for debugging)
+NUM_TRIALS = 5  # Number of trials to run (can be adjusted for debugging)
 UNLABELED = -1  # Cluster label for unlabeled data points (do not change)
-
 
 def main(is_semi_supervised, trial_num):
     """Problem 3: EM for Gaussian Mixture Models (unsupervised and semi-supervised)"""
@@ -17,6 +18,7 @@ def main(is_semi_supervised, trial_num):
     train_path = os.path.join('..', 'data', 'ds3_train.csv')
     x, z = load_gmm_dataset(train_path)
     x_tilde = None
+    m, n = x.shape
 
     if is_semi_supervised:
         # Split into labeled and unlabeled examples
@@ -28,10 +30,43 @@ def main(is_semi_supervised, trial_num):
     # *** START CODE HERE ***
     # (1) Initialize mu and sigma by splitting the m data points uniformly at random
     # into K groups, then calculating the sample mean and covariance for each group
+
+    # shuffling
+    rng = np.random.default_rng()
+    rng.shuffle(x)
+    elements_per_cluster = m / K
+    mu = np.zeros(shape=(K, n))
+    sigma = np.zeros(shape=(K, n, n))
+    
+    for i in range(K):
+        current_cluster = x[i * int(elements_per_cluster): (i + 1) * int(elements_per_cluster)]
+        mu[i] = np.mean(current_cluster, axis=0)
+        sigma[i] = np.cov(current_cluster, rowvar=False)
+
+    m = x.shape[0]
+    # idx = np.random.permutation(m)
+    # group_member= int(m / K)
+    # mu = np.zeros(shape=(K, n))
+    # sigma = np.zeros(shape=(K, n, n))
+
+    # for i in range(K):
+    #     if i!=K-1:
+    # 	    x_temp = x[idx[i*group_member: (i+1)*group_member], :]
+    #     else:
+    # 	    x_temp = x[idx[i*group_member: m], :]
+
+    #     mu_temp = np.mean(x_temp, axis=0)
+    #     mu[i] = (mu_temp)
+    #     sigma[i] = ((x_temp-mu_temp).T.dot(x_temp-mu_temp) / x_temp.shape[0])
+
     # (2) Initialize phi to place equal probability on each Gaussian
     # phi should be a numpy array of shape (K,)
+    phi = np.full(shape=(K,), fill_value=1 / K)
+    
     # (3) Initialize the w values to place equal probability on each Gaussian
     # w should be a numpy array of shape (m, K)
+
+    w = np.full(shape=(m, K), fill_value=1 / K)
     # *** END CODE HERE ***
 
     if is_semi_supervised:
@@ -46,6 +81,62 @@ def main(is_semi_supervised, trial_num):
             z_pred[i] = np.argmax(w[i])
 
     plot_gmm_preds(x, z_pred, is_semi_supervised, plot_id=trial_num)
+
+def normal(x_i, mu, sigma):
+    sign, log_det = np.linalg.slogdet(sigma)
+    root_sigma_det = sign * np.exp(log_det * 0.5)
+    # root_sigma_det = np.sqrt(np.linalg.det(sigma))
+    sigma_inv = np.linalg.inv(sigma)
+    x_i = x_i.reshape(1, x_i.shape[0], 1)
+    d = x_i.shape[0]
+
+    mu = mu.reshape(mu.shape[0], mu.shape[1], 1)
+    mu_trans = np.transpose((x_i - mu), axes=(0, 2, 1))
+
+    factor = 1 / (np.sqrt((2 * np.pi) ** d) * root_sigma_det)
+    
+    return (
+        factor *
+        np.exp(-0.5 *
+               np.matmul(mu_trans, (np.matmul(sigma_inv, x_i - mu)))).reshape(-1)
+    )
+
+
+def em_e_step(x_i, phi, mu, sigma):
+    """
+    applies e_step for a single row 'i'
+    returning the i-th row for the w_i
+    """
+    p_x_z = normal(x_i, mu, sigma) * phi
+    p_x = np.sum(p_x_z)
+
+    return p_x_z / p_x
+
+def em_m_step(x, w, mu):
+    m, n = x.shape
+    w_sum = np.sum(w, axis=0)
+    phi = w_sum / m
+    mu = np.divide(
+        w.T.dot(x),
+        w_sum.reshape(-1, 1),
+        np.zeros_like(w.T.dot(x)),
+        where=w_sum.reshape(-1, 1)!=0)
+    
+    x_minus_mu = x - mu.reshape((mu.shape[0], 1, mu.shape[1]))
+    x_minus_mu_T = np.transpose(x_minus_mu, axes=(0, 2, 1))
+
+    # multiply one by the w
+    w_x_minus_mu = x_minus_mu * w.T.reshape(w.T.shape + (1, ))
+
+    x_minus_mu_squared = np.matmul(x_minus_mu_T, w_x_minus_mu)
+
+    sigma = np.divide(
+        x_minus_mu_squared,
+        w_sum.reshape(w_sum.shape + (1, 1)),
+        x_minus_mu_squared,
+        where=w_sum.reshape(w_sum.shape + (1, 1))!=0)
+    
+    return (phi, mu, sigma)
 
 
 def run_em(x, w, phi, mu, sigma):
@@ -67,21 +158,26 @@ def run_em(x, w, phi, mu, sigma):
     """
     # No need to change any of these parameters
     eps = 1e-3  # Convergence threshold
-    max_iter = 1000
+    max_iter = 100
 
     # Stop when the absolute change in log-likelihood is < eps
     # See below for explanation of the convergence criterion
     it = 0
     ll = prev_ll = None
     while it < max_iter and (prev_ll is None or np.abs(ll - prev_ll) >= eps):
-        pass  # Just a placeholder for the starter code
+        # pass  # Just a placeholder for the starter code
         # *** START CODE HERE
         # (1) E-step: Update your estimates in w
+        w = np.apply_along_axis(em_e_step, 1, x, phi, mu, sigma)
         # (2) M-step: Update the model parameters phi, mu, and sigma
+        phi, mu, sigma = em_m_step(x, w, mu)
         # (3) Compute the log-likelihood of the data to check for convergence.
         # By log-likelihood, we mean `ll = sum_x[log(sum_z[p(x|z) * p(z)])]`.
         # We define convergence by the first iteration where abs(ll - prev_ll) < eps.
         # Hint: For debugging, recall part (a). We showed that ll should be monotonically increasing.
+        p_x = np.matmul(w, phi)
+        prev_ll = ll
+        ll = np.sum(np.log(p_x))
         # *** END CODE HERE ***
 
     return w
