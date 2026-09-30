@@ -8,6 +8,7 @@ PLOT_COLORS = ['red', 'green', 'blue', 'orange']  # Colors for your plots
 K = 4           # Number of Gaussians in the mixture model
 NUM_TRIALS = 5  # Number of trials to run (can be adjusted for debugging)
 UNLABELED = -1  # Cluster label for unlabeled data points (do not change)
+LABELED_PER_CLUSTER = 5
 
 def main(is_semi_supervised, trial_num):
     """Problem 3: EM for Gaussian Mixture Models (unsupervised and semi-supervised)"""
@@ -43,22 +44,6 @@ def main(is_semi_supervised, trial_num):
         mu[i] = np.mean(current_cluster, axis=0)
         sigma[i] = np.cov(current_cluster, rowvar=False)
 
-    m = x.shape[0]
-    # idx = np.random.permutation(m)
-    # group_member= int(m / K)
-    # mu = np.zeros(shape=(K, n))
-    # sigma = np.zeros(shape=(K, n, n))
-
-    # for i in range(K):
-    #     if i!=K-1:
-    # 	    x_temp = x[idx[i*group_member: (i+1)*group_member], :]
-    #     else:
-    # 	    x_temp = x[idx[i*group_member: m], :]
-
-    #     mu_temp = np.mean(x_temp, axis=0)
-    #     mu[i] = (mu_temp)
-    #     sigma[i] = ((x_temp-mu_temp).T.dot(x_temp-mu_temp) / x_temp.shape[0])
-
     # (2) Initialize phi to place equal probability on each Gaussian
     # phi should be a numpy array of shape (K,)
     phi = np.full(shape=(K,), fill_value=1 / K)
@@ -75,6 +60,7 @@ def main(is_semi_supervised, trial_num):
         w = run_em(x, w, phi, mu, sigma)
 
     # Plot your predictions
+    m, _ = x.shape
     z_pred = np.zeros(m)
     if w is not None:  # Just a placeholder for the starter code
         for i in range(m):
@@ -116,7 +102,7 @@ def em_m_step(x, w, mu):
     m, n = x.shape
     w_sum = np.sum(w, axis=0)
     phi = w_sum / m
-    mu = np.divide(
+    new_mu = np.divide(
         w.T.dot(x),
         w_sum.reshape(-1, 1),
         np.zeros_like(w.T.dot(x)),
@@ -136,7 +122,7 @@ def em_m_step(x, w, mu):
         x_minus_mu_squared,
         where=w_sum.reshape(w_sum.shape + (1, 1))!=0)
     
-    return (phi, mu, sigma)
+    return (phi, new_mu, sigma)
 
 
 def run_em(x, w, phi, mu, sigma):
@@ -182,6 +168,42 @@ def run_em(x, w, phi, mu, sigma):
 
     return w
 
+def semi_supervised_e_step(x_i, phi, mu, sigma):
+    return em_e_step(x_i, phi, mu, sigma)
+
+def semi_supervised_m_step(x, x_tilde, z, w, mu, alpha):
+    m, n = x.shape
+    m_tilde, _ = x_tilde.shape
+    w_sum = np.sum(w, axis=0)
+    common_deno = w_sum + alpha * LABELED_PER_CLUSTER
+    clustered_x_tilde = np.zeros(shape=(K, int(m_tilde / K), n))
+
+    for i in range(K):
+        clustered_x_tilde[i] = x_tilde[z.reshape(-1) == i]
+
+    summed_clustered_x_tilde = np.sum(clustered_x_tilde, axis=1)
+    new_phi = common_deno / (m + alpha * m_tilde)
+    new_mu = (
+        (w.T.dot(x) + alpha * summed_clustered_x_tilde)
+    ) / common_deno.reshape(-1, 1)
+
+    x_minus_mu = x - mu.reshape((mu.shape[0], 1, mu.shape[1]))
+    x_minus_mu_T = np.transpose(x_minus_mu, axes=(0, 2, 1))
+
+    x_tilde_minus_mu = clustered_x_tilde - mu.reshape((mu.shape[0], 1, mu.shape[1]))
+    x_tilde_minus_mu_T = np.transpose(x_tilde_minus_mu, axes=(0, 2, 1))
+
+    w_x_minus_mu = x_minus_mu * w.T.reshape(w.T.shape + (1, ))
+    w_x_minus_mu_squared = np.matmul(x_minus_mu_T, w_x_minus_mu)
+
+    x_tilde_minus_mu_squared = np.matmul(x_tilde_minus_mu_T, x_tilde_minus_mu)
+
+    new_sigma = (
+        (w_x_minus_mu_squared + alpha * x_tilde_minus_mu_squared) /
+        (common_deno).reshape(common_deno.shape + (1, 1))
+    )
+
+    return (new_phi, new_mu, new_sigma)
 
 def run_semi_supervised_em(x, x_tilde, z, w, phi, mu, sigma):
     """Problem 3(e): Semi-Supervised EM Algorithm.
@@ -215,10 +237,16 @@ def run_semi_supervised_em(x, x_tilde, z, w, phi, mu, sigma):
         pass  # Just a placeholder for the starter code
         # *** START CODE HERE ***
         # (1) E-step: Update your estimates in w
+        w = np.apply_along_axis(semi_supervised_e_step, 1, x, phi, mu, sigma)
         # (2) M-step: Update the model parameters phi, mu, and sigma
+        phi, mu, sigma = semi_supervised_m_step(x, x_tilde, z, w, mu, alpha)
         # (3) Compute the log-likelihood of the data to check for convergence.
         # Hint: Make sure to include alpha in your calculation of ll.
         # Hint: For debugging, recall part (a). We showed that ll should be monotonically increasing.
+        p_x = np.matmul(w, phi)
+        prev_ll = ll
+        ll = np.sum(np.log(p_x))
+       
         # *** END CODE HERE ***
 
     return w
@@ -293,5 +321,5 @@ if __name__ == '__main__':
         # Once you've implemented the semi-supervised version,
         # uncomment the following line.
         # You do not need to add any other lines in this code block.
-        # main(with_supervision=True, trial_num=t)
+        main(True, trial_num=t)
         # *** END CODE HERE ***
